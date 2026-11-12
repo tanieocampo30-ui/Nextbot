@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXTBOT: Bad Breath</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; overflow: hidden; background: #050607; color: white; font-family: Arial, sans-serif; }
+  canvas { display: block; }
+  body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1; background: radial-gradient(ellipse at center, transparent 42%, rgba(0,0,0,.4) 100%), linear-gradient(180deg,rgba(0,0,0,.1),transparent 25%,transparent 75%,rgba(0,0,0,.2)); }
+  #hud { position: fixed; inset: 0; pointer-events: none; display: none; }
+  #title { position: absolute; top: 8%; width: 100%; text-align: center; color: #d8dddd; font-size: clamp(28px, 5vw, 58px); letter-spacing: 5px; text-shadow: 0 0 18px #b00000; }
+  #subtitle { position: absolute; top: 19%; width: 100%; text-align: center; color: #aaa; letter-spacing: 2px; }
+  #menu, #gameOver, #scare { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: radial-gradient(ellipse at 50% 40%, #242724 0%, #101211 42%, #030405 100%); z-index: 5; }
+  #menu h1 { margin: 0 12px 10px; font-size: clamp(32px, 7vw, 76px); letter-spacing: 4px; color: #e5e5e5; text-shadow: 0 0 22px #a00000; }
+  #menu p { color: #aaa; margin: 8px 20px 24px; line-height: 1.6; }
+  #monsterPicker { display: grid; gap: 8px; margin: 0 20px 24px; color: #c9c4bd; font-size: 12px; letter-spacing: 2px; text-align: left; }
+  #monsterSelect { min-width: 230px; padding: 11px 14px; border: 1px solid #73594a; background: #171513; color: white; font: inherit; letter-spacing: 1px; }
+  button { cursor: pointer; border: 1px solid #9a5b43; background: linear-gradient(180deg,#642e22,#381711); color: white; padding: 14px 34px; font-size: 17px; letter-spacing: 2px; box-shadow: 0 5px 18px #0009; transition: background .2s, transform .2s; }
+  button:hover { background: linear-gradient(180deg,#88432d,#522116); transform: translateY(-2px); }
+  #instructions { position: absolute; bottom: 7%; color: #999; font-size: 13px; line-height: 1.7; }
+  #staminaWrap { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); width: min(280px, 60vw); height: 10px; border: 1px solid #aaa; background: #111; }
+  #stamina { height: 100%; width: 100%; background: #ddd; }
+  #staminaLabel { position: absolute; bottom: 43px; left: 50%; transform: translateX(-50%); font-size: 11px; letter-spacing: 2px; color: #bbb; }
+  #message { position: absolute; top: 5%; width: 100%; text-align: center; color: #eee; font-size: 14px; letter-spacing: 2px; text-shadow: 0 2px 5px black; }
+  #objective { position: absolute; top: 9%; width: 100%; text-align: center; color: #d3b88a; font-size: 11px; letter-spacing: 2px; text-shadow: 0 2px 5px black; }
+  #interactHint { position: absolute; bottom: 82px; width: 100%; text-align: center; color: #f3d9a1; font-size: 13px; letter-spacing: 1.5px; text-shadow: 0 2px 6px black; }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; border: 1px solid #ddd; border-radius: 50%; transform: translate(-50%,-50%); }
+  #gameOver h2 { font-size: clamp(34px, 7vw, 70px); color: #d21c27; text-shadow: 0 0 20px #900; }
+  #scare { display:none; background: #000; z-index: 10; animation: flash .12s infinite alternate; }
+  #scareFace { width: min(80vw, 680px); height: min(72vh, 680px); object-fit: contain; filter: drop-shadow(0 0 35px red) contrast(1.15); }
+  #scareText { color: red; font-size: 30px; letter-spacing: 6px; font-weight: bold; }
+  #mobileControls { display: none; }
+  #mobileInstructions { display: none; }
+  @media (pointer: coarse), (max-width: 760px) {
+    canvas { touch-action: none; }
+    #keyboardInstructions { display: none; }
+    #mobileInstructions { display: block !important; }
+    #hud #interactHint { bottom: 178px; font-size: 11px; }
+    #staminaWrap { top: 16%; bottom: auto; width: min(180px, 50vw); }
+    #staminaLabel { top: calc(16% - 18px); bottom: auto; }
+    #mobileControls { position: fixed; inset: 0; display: block; pointer-events: none; touch-action: none; }
+    #moveJoystick { position: absolute; left: max(20px, env(safe-area-inset-left)); bottom: max(24px, env(safe-area-inset-bottom)); width: 144px; height: 144px; border: 2px solid #ffffff66; border-radius: 50%; background: #10131399; box-shadow: inset 0 0 22px #000b, 0 3px 14px #0009; pointer-events: auto; touch-action: none; }
+    #moveThumb { position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; border: 2px solid #ddd; border-radius: 50%; background: #777a78bb; transform: translate(-50%,-50%); pointer-events: none; }
+    #touchButtons { position: absolute; right: max(20px, env(safe-area-inset-right)); bottom: max(32px, env(safe-area-inset-bottom)); display: grid; gap: 14px; justify-items: center; pointer-events: auto; }
+    .touchButton { display: grid; place-items: center; width: 76px; height: 76px; padding: 8px; border: 2px solid #ffffff88; border-radius: 50%; background: #292a27dd; color: #fff; font-size: 12px; font-weight: bold; letter-spacing: 1px; text-align: center; box-shadow: 0 3px 14px #000b; touch-action: none; user-select: none; -webkit-user-select: none; }
+    #sprintButton { width: 62px; height: 62px; background: #493328dd; }
+    .touchButton:active, .touchButton.active { background: #854832ee; transform: scale(.96); }
+  }
+  @keyframes flash { from { background:#090000; } to { background:#210000; } }
+</style>
+</head>
+<body>
+<div id="menu">
+  <h1 id="menuTitle">NEXTBOT: BAD BREATH</h1>
+  <p>Something is hunting you inside the abandoned facility.<br>Find the maintenance key, hide in a cabinet when it gets close, then unlock the green exit.</p>
+  <label id="monsterPicker" for="monsterSelect">CHOOSE YOUR MONSTER
+    <select id="monsterSelect">
+      <option value="badBreath">Bad Breath</option>
+      <option value="gab">Gab</option>
+      <option value="kared">Kared</option>
+    </select>
+  </label>
+  <button id="startBtn">START GAME</button>
+  <div id="instructions"><span id="keyboardInstructions">WASD — MOVE &nbsp; | &nbsp; MOUSE — LOOK &nbsp; | &nbsp; E — USE / OPEN<br>SHIFT — SPRINT &nbsp; | &nbsp; ESC — PAUSE / RELEASE MOUSE</span><span id="mobileInstructions">JOYSTICK — MOVE &nbsp; | &nbsp; DRAG RIGHT SIDE — LOOK<br>USE — PICK UP KEY / OPEN DOORS / HIDE &nbsp; | &nbsp; SPRINT</span></div>
+</div>
+<div id="hud">
+  <div id="message">FIND THE MAINTENANCE KEY</div><div id="objective">SEARCH THE SUPPLY ROOM</div>
+  <div id="interactHint"></div><div id="crosshair"></div>
+  <div id="staminaLabel">STAMINA</div><div id="staminaWrap"><div id="stamina"></div></div>
+  <div id="mobileControls">
+    <div id="moveJoystick" role="application" aria-label="Movement joystick"><div id="moveThumb"></div></div>
+    <div id="touchButtons">
+      <button id="sprintButton" class="touchButton" type="button" aria-label="Hold to sprint">SPRINT</button>
+      <button id="interactButton" class="touchButton" type="button">USE</button>
+    </div>
+  </div>
+</div>
+<div id="gameOver" style="display:none">
+  <h2>YOU GOT CAUGHT</h2><p id="gameOverMessage">Bad Breath found you.</p><button id="retryBtn">TRY AGAIN</button>
+</div>
+<div id="scare"><img id="scareFace" alt="Monster jumpscare"><div id="scareText">BAD BREATH</div></div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+const menu = document.getElementById('menu');
+const hud = document.getElementById('hud');
+const gameOver = document.getElementById('gameOver');
+const scare = document.getElementById('scare');
+const staminaBar = document.getElementById('stamina');
+const message = document.getElementById('message');
+const objective = document.getElementById('objective');
+const interactHint = document.getElementById('interactHint');
+const menuTitle = document.getElementById('menuTitle');
+const monsterSelect = document.getElementById('monsterSelect');
+const scareFace = document.getElementById('scareFace');
+const scareText = document.getElementById('scareText');
+const gameOverMessage = document.getElementById('gameOverMessage');
+const moveJoystick = document.getElementById('moveJoystick');
+const moveThumb = document.getElementById('moveThumb');
+const sprintButton = document.getElementById('sprintButton');
+const interactButton = document.getElementById('interactButton');
+const hearingRadius = 20;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x030405);
+scene.fog = new THREE.FogExp2(0x080909, 0.008);
+const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 100);
+camera.position.set(0, 1.7, 13);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.3;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0x9ca5aa, 0x17130f, 0.72));
+scene.add(new THREE.AmbientLight(0x8e8d83, 0.2));
+const moon = new THREE.DirectionalLight(0x83909a, 0.18);
+moon.position.set(-8, 15, 7); scene.add(moon);
+const playerLamp = new THREE.SpotLight(0xffdfb1, 13, 30, Math.PI/6, 0.42, 1.05);
+camera.add(playerLamp); playerLamp.position.set(0, 0, 0); playerLamp.target.position.set(0, 0, -1); camera.add(playerLamp.target);
+scene.add(camera);
+
+function makeGrungeTexture(base, flecks, count, streaks=false) {
+  const canvas=document.createElement('canvas'); canvas.width=canvas.height=512;
+  const ctx=canvas.getContext('2d'); ctx.fillStyle=base; ctx.fillRect(0,0,512,512);
+  for(let i=0;i<count;i++) {
+    const shade=flecks[Math.floor(Math.random()*flecks.length)];
+    ctx.globalAlpha=Math.random()*.2+.025; ctx.fillStyle=shade;
+    if(streaks) {
+      const x=Math.random()*512,y=Math.random()*512;
+      ctx.fillRect(x,y,Math.random()*2+1,Math.random()*70+8);
+    } else {
+      const r=Math.random()*15+1; ctx.beginPath(); ctx.ellipse(Math.random()*512,Math.random()*512,r,r*(Math.random()*.6+.2),0,0,Math.PI*2); ctx.fill();
+    }
+  }
+  ctx.globalAlpha=1;
+  const texture=new THREE.CanvasTexture(canvas);
+  texture.colorSpace=THREE.SRGBColorSpace;
+  texture.wrapS=texture.wrapT=THREE.RepeatWrapping;
+  texture.repeat.set(3,3);
+  return texture;
+}
+const wallTexture=makeGrungeTexture('#383a38',['#777267','#181b1a','#705044','#a49a7e'],1800,true);
+const floorTexture=makeGrungeTexture('#292b29',['#777365','#111514','#625347','#929080'],2600);
+const wallMat = new THREE.MeshStandardMaterial({color:0xd0c8b6, map:wallTexture, roughness:0.97});
+const floorMat = new THREE.MeshStandardMaterial({color:0xb1ada1, map:floorTexture, roughness:0.96});
+const ceilingMat = new THREE.MeshStandardMaterial({color:0x292c2b, roughness:0.94});
+const redMat = new THREE.MeshStandardMaterial({color:0x650b10, emissive:0x240000});
+const colliders = [];
+const doors = [];
+const visionOccluders = [];
+const doorFrameMat = new THREE.MeshStandardMaterial({color:0x39362f,metalness:.55,roughness:.72});
+const doorMetalMat = new THREE.MeshStandardMaterial({color:0x77766d,metalness:.78,roughness:.4});
+const doorPanelMat = new THREE.MeshStandardMaterial({color:0x463b30,metalness:.22,roughness:.82});
+const exitDoorMat = new THREE.MeshStandardMaterial({color:0x174c2c,emissive:0x08200f,metalness:.35,roughness:.65});
+function addBox(x,y,z,w,h,d,mat,collide=true) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  mesh.position.set(x,y,z); mesh.castShadow = true; mesh.receiveShadow = true; scene.add(mesh);
+  if (collide) {
+    colliders.push({minX:x-w/2,maxX:x+w/2,minZ:z-d/2,maxZ:z+d/2});
+    visionOccluders.push(mesh);
+  }
+  return mesh;
+}
+function createDoor({x,z,width=1.65,yaw=0,name,locked=false,green=false}) {
+  const height=3, depth=.16;
+  const widthAxisX=Math.cos(yaw), widthAxisZ=-Math.sin(yaw);
+  const hingeX=x-widthAxisX*width/2, hingeZ=z-widthAxisZ*width/2;
+  const frame=new THREE.Group();
+  frame.position.set(x,0,z); frame.rotation.y=yaw; scene.add(frame);
+  for(const side of [-1,1]) {
+    const jamb=new THREE.Mesh(new THREE.BoxGeometry(.14,height,.28),doorFrameMat);
+    jamb.position.set(side*width/2,height/2,0); jamb.castShadow=true; frame.add(jamb);
+  }
+  const lintel=new THREE.Mesh(new THREE.BoxGeometry(width+.14,.16,.28),doorFrameMat);
+  lintel.position.set(0,height-.08,0); lintel.castShadow=true; frame.add(lintel);
+
+  const group=new THREE.Group();
+  group.position.set(hingeX,0,hingeZ); group.rotation.y=yaw; scene.add(group);
+  const panel=new THREE.Mesh(new THREE.BoxGeometry(width,height-.12,depth),green?exitDoorMat:doorPanelMat);
+  panel.position.set(width/2,(height-.12)/2,0); panel.castShadow=true; panel.receiveShadow=true; group.add(panel);
+  visionOccluders.push(panel);
+  for(const y of [.35,height-.5]) {
+    const brace=new THREE.Mesh(new THREE.BoxGeometry(width-.16,.07,depth+.025),doorMetalMat);
+    brace.position.set(width/2,y,0); group.add(brace);
+  }
+  const handle=new THREE.Mesh(new THREE.SphereGeometry(.075,10,8),doorMetalMat);
+  handle.position.set(width-.16,1.45,depth/2+.055); group.add(handle);
+  const lockPlate=new THREE.Mesh(new THREE.BoxGeometry(.18,.28,.035),doorMetalMat);
+  lockPlate.position.set(width-.16,1.28,depth/2+.035); group.add(lockPlate);
+  const door={x,z,width,yaw,baseYaw:yaw,group,locked,green,name,open:false,angle:0};
+  doors.push(door);
+  return door;
+}
+const cabinet = new THREE.Group();
+cabinet.position.set(4.5,0,12);
+scene.add(cabinet);
+const cabinetMetal = new THREE.MeshStandardMaterial({color:0x292c2a,metalness:.7,roughness:.65});
+const cabinetInterior = new THREE.MeshStandardMaterial({color:0x111312,roughness:.94});
+const cabinetParts = [];
+function addCabinetPart(geometry,material,x,y,z) {
+  const mesh=new THREE.Mesh(geometry,material);
+  mesh.position.set(x,y,z); mesh.castShadow=true; mesh.receiveShadow=true; cabinet.add(mesh);
+  cabinetParts.push(mesh);
+  return mesh;
+}
+addCabinetPart(new THREE.BoxGeometry(1.5,2.55,.1),cabinetMetal,0,1.3,.58);
+addCabinetPart(new THREE.BoxGeometry(.12,2.55,1.2),cabinetMetal,-.69,1.3,0);
+addCabinetPart(new THREE.BoxGeometry(.12,2.55,1.2),cabinetMetal,.69,1.3,0);
+addCabinetPart(new THREE.BoxGeometry(1.5,.12,1.2),cabinetMetal,0,2.56,0);
+addCabinetPart(new THREE.BoxGeometry(1.5,.12,1.2),cabinetMetal,0,.08,0);
+addCabinetPart(new THREE.BoxGeometry(1.32,2.3,.035),cabinetInterior,0,1.3,-.48);
+addCabinetPart(new THREE.BoxGeometry(1.32,.08,.92),cabinetMetal,0,2.35,0);
+const cabinetDoorPivot=new THREE.Group();
+cabinetDoorPivot.position.set(-.75,0,-.61); cabinet.add(cabinetDoorPivot);
+let cabinetDoorAngle=1.45,cabinetDoorTarget=1.45;
+const cabinetDoor=new THREE.Mesh(new THREE.BoxGeometry(1.48,2.5,.1),cabinetMetal);
+cabinetDoor.position.set(.74,1.3,0); cabinetDoor.castShadow=true; cabinetDoor.receiveShadow=true;
+cabinetDoorPivot.add(cabinetDoor); cabinetParts.push(cabinetDoor);
+for(const y of [.38,2.2]) {
+  const vent=new THREE.Mesh(new THREE.BoxGeometry(.72,.055,.025),doorMetalMat);
+  vent.position.set(.74,y,-.06); cabinetDoorPivot.add(vent); cabinetParts.push(vent);
+}
+const cabinetHandle=new THREE.Mesh(new THREE.BoxGeometry(.08,.38,.07),doorMetalMat);
+cabinetHandle.position.set(1.32,1.35,-.08); cabinetDoorPivot.add(cabinetHandle); cabinetParts.push(cabinetHandle);
+colliders.push(
+  {minX:3.66,maxX:3.84,minZ:11.4,maxZ:12.6},
+  {minX:5.16,maxX:5.34,minZ:11.4,maxZ:12.6},
+  {minX:3.75,maxX:5.25,minZ:12.48,maxZ:12.68}
+);
+for(const mesh of cabinetParts)visionOccluders.push(mesh);
+cabinetDoorPivot.rotation.y=1.45;
+const cabinetLabelCanvas=document.createElement('canvas');
+cabinetLabelCanvas.width=256; cabinetLabelCanvas.height=96;
+const cabinetLabelContext=cabinetLabelCanvas.getContext('2d');
+cabinetLabelContext.fillStyle='#b9a06c'; cabinetLabelContext.font='bold 34px Arial'; cabinetLabelContext.textAlign='center';
+cabinetLabelContext.fillText('HIDE',128,60);
+const cabinetLabelTexture=new THREE.CanvasTexture(cabinetLabelCanvas);
+cabinetLabelTexture.colorSpace=THREE.SRGBColorSpace;
+const cabinetLabel=new THREE.Mesh(new THREE.PlaneGeometry(.5,.19),new THREE.MeshBasicMaterial({map:cabinetLabelTexture,transparent:true,side:THREE.DoubleSide}));
+cabinetLabel.position.set(0,1.95,-.675); cabinet.add(cabinetLabel);
+const cabinetLight=new THREE.PointLight(0xffc987,.55,2.5);
+cabinetLight.position.set(4.5,2.2,11.1); scene.add(cabinetLight);
+addBox(0,-0.25,0,42,0.5,42,floorMat,false);
+addBox(0,4,0,42,0.3,42,ceilingMat,false);
+// Outer walls
+addBox(0,2,-21,42,4,0.6,wallMat);
+addBox(-2.2,2,21,37.6,4,0.6,wallMat); addBox(20.2,2,21,1.6,4,0.6,wallMat);
+addBox(-21,2,0,0.6,4,42,wallMat); addBox(21,2,0,0.6,4,42,wallMat);
+// Maze corridors with deliberate gaps
+[
+ [-12,2,-13,0.6,4,13],[-5,2,-15,14,4,0.6], [4.5,2,-12,0.6,4,12],
+ [10,2,-19.05,0.6,4,3.9],[10,2,-12.95,0.6,4,3.9], [14,2,-8,13,4,0.6],
+ [-15,2,-2,12,4,0.6],[-8,2,5,0.6,4,13],[-5,2,-8,8,4,0.6],[-4,2,7,0.6,4,8],
+ [-3.95,2,2,6.1,4,0.6],[3.95,2,2,6.1,4,0.6],
+ [7,2,9,0.6,4,12], [14,2,5,12,4,0.6],[-15,2,14,12,4,0.6],
+ [-1,2,16,0.6,4,9]
+].forEach(a=>addBox(...a,wallMat));
+const corridorDoor=createDoor({x:0,z:2,width:1.62,name:'corridor door'});
+const supplyDoor=createDoor({x:10,z:-16,width:1.62,yaw:Math.PI/2,name:'supply room door'});
+const exitDoor=createDoor({x:18,z:21,width:2.5,name:'green exit',locked:true,green:true});
+const supplySignCanvas=document.createElement('canvas');
+supplySignCanvas.width=512; supplySignCanvas.height=128;
+const supplySignContext=supplySignCanvas.getContext('2d');
+supplySignContext.fillStyle='#171915'; supplySignContext.fillRect(0,0,512,128);
+supplySignContext.strokeStyle='#b5945d'; supplySignContext.lineWidth=7; supplySignContext.strokeRect(5,5,502,118);
+supplySignContext.fillStyle='#e2c88f'; supplySignContext.font='bold 58px Arial'; supplySignContext.textAlign='center';
+supplySignContext.fillText('SUPPLY ROOM',256,82);
+const supplySignTexture=new THREE.CanvasTexture(supplySignCanvas);
+supplySignTexture.colorSpace=THREE.SRGBColorSpace;
+const supplySign=new THREE.Mesh(new THREE.PlaneGeometry(1.5,.38),new THREE.MeshBasicMaterial({map:supplySignTexture,side:THREE.DoubleSide}));
+supplySign.position.set(9.66,3.42,-16); supplySign.rotation.y=-Math.PI/2; scene.add(supplySign);
+// Recessed, caged fixtures make the lighting read as part of the building.
+const fixtures=[];
+const fixturePositions=[[-17,-17],[-7,-17],[5,-17],[17,-17],[-17,-7],[-2,-7],[9,-7],[17,1],[-17,7],[-2,7],[10,14],[1,18]];
+const fixtureMetal=new THREE.MeshStandardMaterial({color:0x292b29,metalness:.65,roughness:.72});
+const bulbMat=new THREE.MeshStandardMaterial({color:0xffe2b0,emissive:0xff9b42,emissiveIntensity:2.2});
+for(let i=0;i<fixturePositions.length;i++) {
+  const [x,z]=fixturePositions[i];
+  const housing=new THREE.Mesh(new THREE.BoxGeometry(1.05,.13,.48),fixtureMetal);
+  housing.position.set(x,3.7,z); housing.castShadow=true; scene.add(housing);
+  const bulb=new THREE.Mesh(new THREE.BoxGeometry(.78,.045,.24),bulbMat);
+  bulb.position.set(x,3.61,z); scene.add(bulb);
+  const light=new THREE.PointLight(0xffc987,i%4===0?2.5:3.2,15,1.8);
+  light.position.set(x,3.48,z); scene.add(light);
+  fixtures.push({light,base:light.intensity,phase:Math.random()*Math.PI*2});
+}
+// Small service pipes and warning stripes add scale and age to the corridors.
+const pipeMat=new THREE.MeshStandardMaterial({color:0x423e37,metalness:.62,roughness:.7});
+for(const z of [-18,-10,-2,6,14]) {
+  const pipe=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,38,8),pipeMat);
+  pipe.rotation.z=Math.PI/2; pipe.position.set(0,3.55,z); pipe.castShadow=true; scene.add(pipe);
+}
+// The green exit is a real hinged door; the player must bring the access key.
+const exitGlow = new THREE.PointLight(0x57b878, 2.4, 10); exitGlow.position.set(18,2.7,19); scene.add(exitGlow);
+const exitSign=new THREE.Mesh(new THREE.BoxGeometry(1.35,.34,.06),new THREE.MeshBasicMaterial({color:0x48cb71}));
+exitSign.position.set(18,3.18,20.62); scene.add(exitSign);
+const accessKey=new THREE.Group();
+const keyCard=new THREE.Mesh(new THREE.BoxGeometry(.42,.12,.58),new THREE.MeshStandardMaterial({color:0x173b40,metalness:.55,roughness:.35,emissive:0x061516}));
+keyCard.add(new THREE.Mesh(new THREE.BoxGeometry(.3,.025,.08),new THREE.MeshBasicMaterial({color:0x7ce0a2})).translateY(.072));
+accessKey.add(keyCard);
+const keyLight=new THREE.PointLight(0x55e58c,1.4,4);
+keyLight.position.set(0,.3,0); accessKey.add(keyLight);
+accessKey.position.set(15,.85,-13);
+scene.add(accessKey);
+
+const monster = new THREE.Group();
+const monsterOptions = {
+  badBreath: {name:'Bad Breath', image:'./powerupsbulig-removebg-preview.png', audio:'./bulig.mp3'},
+  gab: {name:'Gab', image:'./gab.png', audio:'./gabb.mp3'},
+  kared: {name:'Kared', image:'./kared.png', audio:'./karedd.mp3'}
+};
+let selectedMonster = monsterOptions[monsterSelect.value];
+const monsterTextureLoader = new THREE.TextureLoader();
+const monsterImage = monsterTextureLoader.load(selectedMonster.image);
+monsterImage.colorSpace = THREE.SRGBColorSpace;
+monsterImage.anisotropy = renderer.capabilities.getMaxAnisotropy();
+const monsterGlowMaterial = new THREE.MeshBasicMaterial({map:monsterImage, color:0xff2020, transparent:true, opacity:0.72, alphaTest:0.08, depthWrite:false, side:THREE.DoubleSide});
+const monsterGlow = new THREE.Mesh(new THREE.PlaneGeometry(3.1,3.1), monsterGlowMaterial);
+monsterGlow.position.set(0,1.48,-0.025);
+monster.add(monsterGlow);
+const monsterPortraitMaterial = new THREE.MeshBasicMaterial({map:monsterImage, color:0xe0d5d5, transparent:true, alphaTest:0.08, side:THREE.DoubleSide});
+const monsterPortrait = new THREE.Mesh(new THREE.PlaneGeometry(2.9,2.9), monsterPortraitMaterial);
+monsterPortrait.position.set(0,1.48,0);
+monster.add(monsterPortrait);
+const monsterAura = new THREE.PointLight(0x9b0808,1.8,5.5);
+monsterAura.position.set(0,1.5,0);
+monster.add(monsterAura);
+monster.position.set(-16,0,-16); scene.add(monster);
+
+let running=false, started=false, gameEnded=false, stamina=100, yaw=0, pitch=0;
+const keys={};
+const mobileMove=new THREE.Vector2();
+let joystickPointerId=null;
+let lookPointerId=null;
+let touchLookX=0,touchLookY=0;
+const player = new THREE.Vector3(0,1.7,13);
+const direction = new THREE.Vector3();
+const clock = new THREE.Clock();
+let audioCtx=null;
+let proximityGain=null;
+let proximityCompressor=null;
+let proximitySource=null;
+const proximityBuffers=new Map();
+const proximityLoads=new Map();
+let hasAccessKey=false;
+let isHiding=false;
+let aiState='patrol';
+let lastSeenPosition=new THREE.Vector3();
+let lastSeenAt=0;
+let nextSearchAt=0;
+let searchTarget=new THREE.Vector3();
+let patrolIndex=0;
+let monsterPath=[];
+let pathTargetKey='';
+let pathRefreshAt=0;
+const patrolPoints=[[-16,-16],[-4,-17],[5,-17],[16,-17],[16,-7],[14,0],[4,0],[-4,-4],[-16,4],[-16,15],[-5,17],[8,17],[16,13]];
+const gridMin=-20, gridStep=.7, gridSize=58;
+const pathDirections=[[1,0],[-1,0],[0,1],[0,-1]];
+const sightRaycaster=new THREE.Raycaster();
+const sightDirection=new THREE.Vector3();
+
+function beep(freq=90,duration=.18,type='sawtooth',volume=.04) {
+  try {
+    audioCtx ||= new (window.AudioContext||window.webkitAudioContext)();
+    const osc=audioCtx.createOscillator(), gain=audioCtx.createGain();
+    osc.type=type; osc.frequency.value=freq; gain.gain.value=volume;
+    osc.connect(gain); gain.connect(audioCtx.destination); osc.start();
+    gain.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+duration); osc.stop(audioCtx.currentTime+duration);
+  } catch(e) {}
+}
+function chooseMonster() {
+  const choice=monsterOptions[monsterSelect.value];
+  if(!choice)throw new Error(`Unknown monster choice: ${monsterSelect.value}`);
+  selectedMonster=choice;
+  menuTitle.textContent=`NEXTBOT: ${choice.name.toUpperCase()}`;
+  document.title=`NEXTBOT: ${choice.name}`;
+  scareFace.src=choice.image;
+  scareText.textContent=choice.name.toUpperCase();
+  monsterTextureLoader.load(choice.image,texture=>{
+    if(selectedMonster!==choice) {
+      texture.dispose();
+      return;
+    }
+    texture.colorSpace=THREE.SRGBColorSpace;
+    texture.anisotropy=renderer.capabilities.getMaxAnisotropy();
+    monsterGlowMaterial.map=texture;
+    monsterPortraitMaterial.map=texture;
+    monsterGlowMaterial.needsUpdate=true;
+    monsterPortraitMaterial.needsUpdate=true;
+  },undefined,error=>console.error(`Could not load ${choice.name} image:`,error));
+}
+function prepareProximityAudio() {
+  try {
+    audioCtx ||= new (window.AudioContext||window.webkitAudioContext)();
+    if(!proximityGain) {
+      proximityGain=audioCtx.createGain();
+      proximityGain.gain.value=0;
+      proximityCompressor=audioCtx.createDynamicsCompressor();
+      proximityCompressor.threshold.value=-12;
+      proximityCompressor.knee.value=12;
+      proximityCompressor.ratio.value=8;
+      proximityCompressor.attack.value=.003;
+      proximityCompressor.release.value=.2;
+      proximityGain.connect(proximityCompressor);
+      proximityCompressor.connect(audioCtx.destination);
+    }
+  } catch(error) {
+    console.error('Could not initialize monster proximity audio:',error);
+    return;
+  }
+  audioCtx.resume().catch(error=>console.error('Could not enable monster proximity audio:',error));
+  const audioFile=selectedMonster.audio;
+  if(!proximityBuffers.has(audioFile)&&!proximityLoads.has(audioFile)) {
+    const loadPromise=fetch(audioFile)
+      .then(response=>{
+        if(!response.ok)throw new Error(`${audioFile} returned HTTP ${response.status}`);
+        return response.arrayBuffer();
+      })
+      .then(data=>audioCtx.decodeAudioData(data))
+      .then(buffer=>{proximityBuffers.set(audioFile,buffer);})
+      .catch(error=>{
+        console.error(`Could not load or decode ${audioFile}:`,error);
+      })
+      .finally(()=>proximityLoads.delete(audioFile));
+    proximityLoads.set(audioFile,loadPromise);
+  }
+}
+function stopProximityAudio() {
+  if(proximitySource) {
+    proximitySource.stop();
+    proximitySource.disconnect();
+    proximitySource=null;
+  }
+  if(proximityGain&&audioCtx) {
+    proximityGain.gain.cancelScheduledValues(audioCtx.currentTime);
+    proximityGain.gain.setValueAtTime(0,audioCtx.currentTime);
+  }
+}
+function blocked(x,z) {
+  const r=0.38;
+  if(colliders.some(c=>x+r>c.minX&&x-r<c.maxX&&z+r>c.minZ&&z-r<c.maxZ))return true;
+  return doors.some(door=>{
+    const dx=x-door.group.position.x, dz=z-door.group.position.z;
+    const angle=door.group.rotation.y, cos=Math.cos(angle), sin=Math.sin(angle);
+    const localX=cos*dx-sin*dz, localZ=sin*dx+cos*dz;
+    return localX>-r&&localX<door.width+r&&Math.abs(localZ)<0.08+r;
+  });
+}
+function nearestWalkableCell(x,z) {
+  const centerX=THREE.MathUtils.clamp(Math.round((x-gridMin)/gridStep),0,gridSize-1);
+  const centerZ=THREE.MathUtils.clamp(Math.round((z-gridMin)/gridStep),0,gridSize-1);
+  for(let radius=0;radius<8;radius++) {
+    for(let dz=-radius;dz<=radius;dz++) {
+      for(let dx=-radius;dx<=radius;dx++) {
+        if(Math.abs(dx)+Math.abs(dz)!==radius)continue;
+        const cellX=centerX+dx,cellZ=centerZ+dz;
+        if(cellX<0||cellX>=gridSize||cellZ<0||cellZ>=gridSize)continue;
+        const px=gridMin+cellX*gridStep,pz=gridMin+cellZ*gridStep;
+        if(!blocked(px,pz))return {x:cellX,z:cellZ};
+      }
+    }
+  }
+  return null;
+}
+function findMonsterPath(targetX,targetZ) {
+  const start=nearestWalkableCell(monster.position.x,monster.position.z);
+  const goal=nearestWalkableCell(targetX,targetZ);
+  if(!start||!goal)return [];
+  const startKey=start.z*gridSize+start.x,goalKey=goal.z*gridSize+goal.x;
+  const previous=new Int32Array(gridSize*gridSize).fill(-1);
+  const queue=new Int32Array(gridSize*gridSize);
+  let head=0,tail=0;
+  queue[tail++]=startKey; previous[startKey]=startKey;
+  while(head<tail&&previous[goalKey]===-1) {
+    const key=queue[head++],x=key%gridSize,z=Math.floor(key/gridSize);
+    for(const [dx,dz] of pathDirections) {
+      const nextX=x+dx,nextZ=z+dz;
+      if(nextX<0||nextX>=gridSize||nextZ<0||nextZ>=gridSize)continue;
+      const nextKey=nextZ*gridSize+nextX;
+      if(previous[nextKey]!==-1)continue;
+      const worldX=gridMin+nextX*gridStep,worldZ=gridMin+nextZ*gridStep;
+      if(blocked(worldX,worldZ))continue;
+      previous[nextKey]=key; queue[tail++]=nextKey;
+    }
+  }
+  if(previous[goalKey]===-1)return [];
+  const path=[];
+  for(let key=goalKey;key!==startKey;key=previous[key]) {
+    path.push(new THREE.Vector3(gridMin+(key%gridSize)*gridStep,0,gridMin+Math.floor(key/gridSize)*gridStep));
+  }
+  path.reverse();
+  return path;
+}
+function monsterCanSeePlayer(distance) {
+  if(isHiding||distance>19)return false;
+  sightDirection.set(player.x-monster.position.x,0,player.z-monster.position.z).normalize();
+  const facingX=Math.sin(monster.rotation.y),facingZ=Math.cos(monster.rotation.y);
+  if(facingX*sightDirection.x+facingZ*sightDirection.z<.35)return false;
+  const origin=new THREE.Vector3(monster.position.x,1.65,monster.position.z);
+  sightDirection.set(player.x-monster.position.x,player.y-1.65,player.z-monster.position.z).normalize();
+  sightRaycaster.set(origin,sightDirection);
+  sightRaycaster.far=distance;
+  const obstruction=sightRaycaster.intersectObjects(visionOccluders,false)[0];
+  return !obstruction||obstruction.distance>distance-.2;
+}
+function updateMonsterAI(dt,now,dist) {
+  const seesPlayer=monsterCanSeePlayer(dist);
+  if(seesPlayer) {
+    aiState='chase'; lastSeenPosition.set(player.x,0,player.z); lastSeenAt=now;
+  } else if(aiState==='chase') {
+    aiState='search'; nextSearchAt=now+1.5; searchTarget.copy(lastSeenPosition);
+  } else if(aiState==='search'&&now-lastSeenAt>9) {
+    aiState='patrol'; patrolIndex=(patrolIndex+1)%patrolPoints.length;
+  }
+
+  let target=new THREE.Vector3();
+  if(aiState==='chase')target=lastSeenPosition;
+  else if(aiState==='search') {
+    if(Math.hypot(monster.position.x-searchTarget.x,monster.position.z-searchTarget.z)<.9&&now>nextSearchAt) {
+      const angle=Math.random()*Math.PI*2,radius=1.5+Math.random()*2.5;
+      searchTarget.set(lastSeenPosition.x+Math.cos(angle)*radius,0,lastSeenPosition.z+Math.sin(angle)*radius);
+      nextSearchAt=now+1.4;
+    }
+    target=searchTarget;
+  } else {
+    const point=patrolPoints[patrolIndex];
+    target.set(point[0],0,point[1]);
+    if(Math.hypot(monster.position.x-target.x,monster.position.z-target.z)<.9) {
+      patrolIndex=(patrolIndex+1)%patrolPoints.length;
+      pathTargetKey='';
+    }
+  }
+
+  const targetKey=`${Math.round(target.x/gridStep)}:${Math.round(target.z/gridStep)}:${aiState}`;
+  if(now>=pathRefreshAt||targetKey!==pathTargetKey||monsterPath.length===0) {
+    monsterPath=findMonsterPath(target.x,target.z);
+    pathTargetKey=targetKey; pathRefreshAt=now+.65;
+  }
+  while(monsterPath.length&&Math.hypot(monster.position.x-monsterPath[0].x,monster.position.z-monsterPath[0].z)<.38)monsterPath.shift();
+  const next=monsterPath[0]||target;
+  const dx=next.x-monster.position.x,dz=next.z-monster.position.z;
+  const distanceToNext=Math.hypot(dx,dz);
+  const speed=aiState==='chase'?3.6+(dist<8?.85:0)+(stamina<20?.45:0):aiState==='search'?2.1:1.5;
+  if(distanceToNext>.05) {
+    const step=Math.min(speed*dt,distanceToNext);
+    const nextX=monster.position.x+dx/distanceToNext*step;
+    const nextZ=monster.position.z+dz/distanceToNext*step;
+    if(!blocked(nextX,monster.position.z))monster.position.x=nextX;
+    if(!blocked(monster.position.x,nextZ))monster.position.z=nextZ;
+    monster.rotation.y=Math.atan2(dx,dz);
+  } else if(aiState==='patrol') {
+    monster.rotation.y+=dt*.65;
+  }
+  monster.position.y=Math.abs(Math.sin(performance.now()*0.009))*0.06;
+  return seesPlayer;
+}
+function updateProximityAudio(distance,dt) {
+  const proximity=Math.max(0,1-distance/hearingRadius);
+  const targetVolume=Math.pow(proximity,.65)*1.15;
+  const buffer=proximityBuffers.get(selectedMonster.audio);
+  if(!proximityGain||!audioCtx)return;
+  if(targetVolume>0&&buffer&&!proximitySource) {
+    proximitySource=audioCtx.createBufferSource();
+    proximitySource.buffer=buffer;
+    proximitySource.loop=true;
+    proximitySource.connect(proximityGain);
+    proximitySource.start();
+  }
+  proximityGain.gain.value+= (targetVolume-proximityGain.gain.value)*Math.min(1,dt*5);
+  if(targetVolume===0&&proximityGain.gain.value<.005&&proximitySource) {
+    stopProximityAudio();
+  }
+}
+function interact() {
+  if(isHiding) {
+    isHiding=false;
+    cabinetDoorTarget=1.45;
+    player.set(cabinet.position.x,camera.position.y,cabinet.position.z-1.1);
+    message.textContent='YOU LEFT THE CABINET';
+    return;
+  }
+  if(Math.hypot(player.x-cabinet.position.x,player.z-(cabinet.position.z-1))<2.1) {
+    isHiding=true;
+    cabinetDoorTarget=0;
+    player.set(cabinet.position.x,1.65,cabinet.position.z);
+    camera.position.set(player.x,player.y,player.z);
+    message.textContent='HIDDEN — STAY QUIET';
+    return;
+  }
+  if(!hasAccessKey&&accessKey.visible&&Math.hypot(player.x-accessKey.position.x,player.z-accessKey.position.z)<1.8) {
+    hasAccessKey=true;
+    accessKey.visible=false;
+    exitDoor.locked=false;
+    message.textContent='MAINTENANCE KEY ACQUIRED';
+    objective.textContent='RETURN TO THE GREEN EXIT';
+    beep(720,.12,'sine',.06);
+    return;
+  }
+  const door=doors.reduce((closest,candidate)=>{
+    const distance=Math.hypot(player.x-candidate.x,player.z-candidate.z);
+    return distance<closest.distance?{door:candidate,distance}:closest;
+  },{door:null,distance:Infinity});
+  if(!door.door||door.distance>2.5)return;
+  if(door.door.locked&&!hasAccessKey) {
+    message.textContent='THE EXIT IS LOCKED';
+    objective.textContent='FIND THE MAINTENANCE KEY IN THE SUPPLY ROOM';
+    beep(110,.2,'square',.04);
+    return;
+  }
+  door.door.open=!door.door.open;
+  beep(door.door.open?180:125,.15,'triangle',.045);
+}
+function updateJoystick(event) {
+  const bounds=moveJoystick.getBoundingClientRect();
+  const centerX=bounds.left+bounds.width/2, centerY=bounds.top+bounds.height/2;
+  const maxRadius=bounds.width*.34;
+  const dx=event.clientX-centerX,dy=event.clientY-centerY;
+  const distance=Math.hypot(dx,dy),scale=distance>maxRadius?maxRadius/distance:1;
+  mobileMove.set(dx*scale/maxRadius,dy*scale/maxRadius);
+  moveThumb.style.transform=`translate(calc(-50% + ${mobileMove.x*maxRadius}px), calc(-50% + ${mobileMove.y*maxRadius}px))`;
+}
+function releaseJoystick() {
+  joystickPointerId=null;
+  mobileMove.set(0,0);
+  moveThumb.style.transform='translate(-50%,-50%)';
+}
+function releaseTouchControls() {
+  releaseJoystick();
+  lookPointerId=null;
+  keys.ShiftLeft=false;
+  sprintButton.classList.remove('active');
+}
+function reset() {
+  player.set(0,1.7,13); camera.position.copy(player); yaw=0; pitch=0;
+  releaseTouchControls();
+  monster.position.set(-16,0,-16); monster.rotation.y=0; stamina=100; gameEnded=false; running=true;
+  isHiding=false; aiState='patrol'; lastSeenAt=0; patrolIndex=0;
+  monsterPath=[]; pathTargetKey=''; pathRefreshAt=0;
+  cabinetDoorAngle=1.45; cabinetDoorTarget=1.45; cabinetDoorPivot.rotation.y=cabinetDoorAngle;
+  for(const key in keys)keys[key]=false;
+  hasAccessKey=false; accessKey.visible=true;
+  stopProximityAudio();
+  for(const door of doors) {
+    door.open=false; door.angle=0; door.group.rotation.y=door.baseYaw;
+    door.locked=door===exitDoor;
+  }
+  message.textContent='FIND THE MAINTENANCE KEY';
+  objective.textContent='SEARCH THE SUPPLY ROOM';
+  interactHint.textContent='';
+  gameOver.querySelector('h2').textContent='YOU GOT CAUGHT';
+  gameOverMessage.textContent=`${selectedMonster.name} found you.`;
+  gameOver.style.display='none'; scare.style.display='none'; menu.style.display='none'; hud.style.display='block';
+  if(!matchMedia('(pointer: coarse)').matches)document.body.requestPointerLock?.();
+  clock.getDelta();
+}
+function endGame() {
+  if(gameEnded)return; gameEnded=true; running=false;
+  stopProximityAudio();
+  scare.style.display='flex'; beep(42,.8,'sawtooth',.12);
+  setTimeout(()=>{scare.style.display='none';gameOver.style.display='flex';hud.style.display='none';document.exitPointerLock?.();},850);
+}
+monsterSelect.addEventListener('change',()=>{
+  chooseMonster();
+  if(started)prepareProximityAudio();
+});
+document.getElementById('startBtn').addEventListener('click',()=>{started=true;prepareProximityAudio();reset();});
+document.getElementById('retryBtn').addEventListener('click',()=>{prepareProximityAudio();reset();});
+document.addEventListener('pointerdown',()=>{
+  if(started&&audioCtx&&audioCtx.state!=='running')audioCtx.resume().catch(error=>console.error('Could not resume monster audio:',error));
+});
+document.addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  if(e.code==='Escape'&&running)message.textContent='PAUSED — CLICK THE GAME TO RESUME';
+  if(e.code==='KeyE'&&!e.repeat&&running)interact();
+});
+document.addEventListener('keyup',e=>keys[e.code]=false);
+moveJoystick.addEventListener('pointerdown',event=>{
+  if(!running||joystickPointerId!==null)return;
+  event.preventDefault();
+  joystickPointerId=event.pointerId;
+  moveJoystick.setPointerCapture(event.pointerId);
+  updateJoystick(event);
+});
+moveJoystick.addEventListener('pointermove',event=>{
+  if(event.pointerId===joystickPointerId)updateJoystick(event);
+});
+moveJoystick.addEventListener('pointerup',event=>{
+  if(event.pointerId===joystickPointerId)releaseJoystick();
+});
+moveJoystick.addEventListener('pointercancel',releaseJoystick);
+interactButton.addEventListener('click',()=>{if(running)interact();});
+sprintButton.addEventListener('pointerdown',event=>{
+  if(!running)return;
+  event.preventDefault();
+  sprintButton.setPointerCapture(event.pointerId);
+  keys.ShiftLeft=true;
+  sprintButton.classList.add('active');
+});
+function releaseSprint(event) {
+  if(event.pointerId!==undefined&&!sprintButton.hasPointerCapture(event.pointerId))return;
+  keys.ShiftLeft=false;
+  sprintButton.classList.remove('active');
+}
+sprintButton.addEventListener('pointerup',releaseSprint);
+sprintButton.addEventListener('pointercancel',releaseSprint);
+document.addEventListener('pointermove',event=>{
+  if(event.pointerId!==lookPointerId||!running)return;
+  yaw-=(event.clientX-touchLookX)*.004;
+  pitch-=(event.clientY-touchLookY)*.004;
+  touchLookX=event.clientX;
+  touchLookY=event.clientY;
+  pitch=Math.max(-1.35,Math.min(1.35,pitch));
+});
+renderer.domElement.addEventListener('pointerdown',event=>{
+  if(event.pointerType!=='touch'||!running||event.clientX<innerWidth*.38)return;
+  lookPointerId=event.pointerId;
+  touchLookX=event.clientX;
+  touchLookY=event.clientY;
+  renderer.domElement.setPointerCapture(event.pointerId);
+});
+renderer.domElement.addEventListener('pointerup',event=>{if(event.pointerId===lookPointerId)lookPointerId=null;});
+renderer.domElement.addEventListener('pointercancel',event=>{if(event.pointerId===lookPointerId)lookPointerId=null;});
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden)releaseTouchControls();
+  else if(running&&started)prepareProximityAudio();
+});
+document.addEventListener('mousemove',e=>{
+  if(document.pointerLockElement===document.body&&running){yaw-=e.movementX*0.0022;pitch-=e.movementY*0.0022;pitch=Math.max(-1.35,Math.min(1.35,pitch));}
+});
+document.addEventListener('pointerlockchange',()=>{if(document.pointerLockElement===document.body&&running)message.textContent=hasAccessKey?'UNLOCK THE GREEN EXIT':'FIND THE MAINTENANCE KEY';});
+renderer.domElement.addEventListener('click',()=>{if(running&&!document.pointerLockElement)document.body.requestPointerLock?.();});
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),0.04);
+  const now=performance.now()*.001;
+  for(const fixture of fixtures) {
+    const failing=Math.sin(now*1.7+fixture.phase)>0.995;
+    fixture.light.intensity=fixture.base*(failing ? .12 : (.96+Math.sin(now*4+fixture.phase)*.025));
+  }
+  for(const door of doors) {
+    door.angle=THREE.MathUtils.damp(door.angle,door.open?Math.PI/2:0,6,dt);
+    door.group.rotation.y=door.baseYaw+door.angle;
+  }
+  cabinetDoorAngle=THREE.MathUtils.damp(cabinetDoorAngle,cabinetDoorTarget,8,dt);
+  cabinetDoorPivot.rotation.y=cabinetDoorAngle;
+  accessKey.rotation.y=now*.8;
+  accessKey.position.y=.85+Math.sin(now*2)*.08;
+  if(running&&!gameEnded) {
+    camera.rotation.order='YXZ'; camera.rotation.y=yaw; camera.rotation.x=pitch;
+    const forward=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw));
+    const right=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
+    direction.set(0,0,0);
+    if(keys.KeyW||keys.ArrowUp)direction.add(forward);
+    if(keys.KeyS||keys.ArrowDown)direction.sub(forward);
+    if(keys.KeyD||keys.ArrowRight)direction.add(right);
+    if(keys.KeyA||keys.ArrowLeft)direction.sub(right);
+    direction.addScaledVector(forward,-mobileMove.y);
+    direction.addScaledVector(right,mobileMove.x);
+    if(isHiding)direction.set(0,0,0);
+    const moving=direction.lengthSq()>0;
+    const movementAmount=Math.min(direction.length(),1);
+    if(moving)direction.normalize();
+    const sprint=(keys.ShiftLeft||keys.ShiftRight)&&stamina>0&&moving;
+    const speed=(sprint?7.4:4.1)*movementAmount;
+    if(sprint)stamina=Math.max(0,stamina-27*dt);else stamina=Math.min(100,stamina+17*dt);
+    const nx=player.x+direction.x*speed*dt, nz=player.z+direction.z*speed*dt;
+    if(!blocked(nx,player.z))player.x=nx;
+    if(!blocked(player.x,nz))player.z=nz;
+    camera.position.set(player.x,isHiding?1.65:1.7+(moving?Math.sin(performance.now()*0.012)*0.035:0),player.z);
+    staminaBar.style.width=stamina+'%';
+    const dx=player.x-monster.position.x, dz=player.z-monster.position.z;
+    const dist=Math.hypot(dx,dz);
+    const seesPlayer=updateMonsterAI(dt,now,dist);
+    updateProximityAudio(dist,dt);
+    if(!isHiding&&dist<1.25)endGame();
+    if(hasAccessKey&&exitDoor.open&&player.z>21.35&&player.x>16.35&&player.x<19.65) {
+      running=false; hud.style.display='none'; gameOver.style.display='flex';
+      gameOver.querySelector('h2').textContent='YOU ESCAPED';
+      gameOver.querySelector('p').textContent='You found the key and made it out.';
+      stopProximityAudio();
+      document.exitPointerLock?.();
+    }
+    const keyDistance=Math.hypot(player.x-accessKey.position.x,player.z-accessKey.position.z);
+    const nearestDoor=doors.reduce((closest,door)=>{
+      const distance=Math.hypot(player.x-door.x,player.z-door.z);
+      return distance<closest.distance?{door,distance}:closest;
+    },{door:null,distance:Infinity});
+    const cabinetDistance=Math.hypot(player.x-cabinet.position.x,player.z-(cabinet.position.z-1));
+    interactHint.textContent=isHiding
+      ?'E — LEAVE THE CABINET'
+      :cabinetDistance<2.1
+        ?'E — HIDE IN THE CABINET'
+        :!hasAccessKey&&accessKey.visible&&keyDistance<1.8
+          ?'E — TAKE THE MAINTENANCE KEY'
+      :nearestDoor.door&&nearestDoor.distance<2.5
+        ?nearestDoor.door.locked?'LOCKED — NEEDS MAINTENANCE KEY':`E — ${nearestDoor.door.open?'CLOSE':'OPEN'} ${nearestDoor.door.name.toUpperCase()}`
+        :'';
+    objective.textContent=hasAccessKey?'RETURN TO THE GREEN EXIT':'FIND THE MAINTENANCE KEY IN THE SUPPLY ROOM';
+    message.textContent=isHiding
+      ?'HIDDEN — STAY QUIET'
+      :seesPlayer
+        ?'IT SEES YOU — HIDE!'
+        :aiState==='search'
+          ?'IT IS SEARCHING NEARBY'
+          :dist<7
+            ?'IT IS CLOSE — FIND A HIDING PLACE'
+            :(hasAccessKey?'UNLOCK THE GREEN EXIT':'FIND THE MAINTENANCE KEY');
+  }
+  renderer.render(scene,camera);
+}
+animate();
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+</script>
+</body>
+</html>
